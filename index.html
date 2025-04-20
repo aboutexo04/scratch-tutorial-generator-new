@@ -35,7 +35,17 @@
             background-color: #f9f9f9;
         }
         
-        .file-input {
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .file-input, .text-input {
             display: block;
             width: 100%;
             padding: 10px;
@@ -119,6 +129,37 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        
+        .tab-button {
+            padding: 8px 15px;
+            background-color: #eee;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        
+        .tab-button.active {
+            background-color: white;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 0 5px 5px 5px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -128,26 +169,56 @@
         
         <div class="upload-section">
             <h2>Upload Images</h2>
-            <input type="file" id="file-input" class="file-input" accept="image/*" multiple>
-            <div id="image-preview"></div>
-            <button id="upload-button" class="button">Generate Tutorial</button>
+            
+            <form id="upload-form">
+                <div class="form-group">
+                    <label for="project-title">Project Title:</label>
+                    <input type="text" id="project-title" name="projectTitle" class="text-input" placeholder="Enter project title (e.g., Scratch Paddle Game)" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="file-input">Select Screenshots (up to 5 images):</label>
+                    <input type="file" id="file-input" name="scratchImages" class="file-input" accept="image/*" multiple required>
+                </div>
+                
+                <div id="image-preview"></div>
+                
+                <button type="submit" id="upload-button" class="button">Generate Tutorial</button>
+            </form>
         </div>
         
         <div class="loader" id="loader"></div>
         
         <div id="result-section">
-            <h2>Generated Tutorial</h2>
-            <div id="tutorial-result"></div>
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="tutorial">Tutorial</button>
+                <button class="tab-button" data-tab="react-format">React Format</button>
+            </div>
+            
+            <div id="tutorial-tab" class="tab-content active">
+                <h2>Generated Tutorial</h2>
+                <div id="tutorial-result"></div>
+            </div>
+            
+            <div id="react-format-tab" class="tab-content">
+                <h2>React Component Format</h2>
+                <div id="react-format-result"></div>
+                <button id="copy-react-btn" class="button" style="margin-top: 15px;">Copy React Format</button>
+            </div>
         </div>
     </div>
 
     <script>
         // Elements
+        const uploadForm = document.getElementById('upload-form');
         const fileInput = document.getElementById('file-input');
         const imagePreview = document.getElementById('image-preview');
-        const uploadButton = document.getElementById('upload-button');
         const loader = document.getElementById('loader');
         const tutorialResult = document.getElementById('tutorial-result');
+        const reactFormatResult = document.getElementById('react-format-result');
+        const copyReactBtn = document.getElementById('copy-react-btn');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
         
         // Selected files array to manage our files
         let selectedFiles = [];
@@ -199,6 +270,7 @@
                 const removeButton = document.createElement('button');
                 removeButton.className = 'remove-button';
                 removeButton.textContent = '×';
+                removeButton.type = 'button'; // Prevent form submission
                 removeButton.onclick = function() {
                     selectedFiles.splice(index, 1);
                     updatePreview();
@@ -210,19 +282,30 @@
             });
         }
         
-        // Handle upload/generate button click
-        uploadButton.addEventListener('click', async function() {
+        // Handle form submission
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
             if (selectedFiles.length === 0) {
                 alert('Please select at least one image');
+                return;
+            }
+            
+            // Get project title
+            const projectTitle = document.getElementById('project-title').value.trim();
+            if (!projectTitle) {
+                alert('Please enter a project title');
                 return;
             }
             
             // Show loader
             loader.style.display = 'block';
             tutorialResult.innerHTML = 'Generating tutorial...';
+            reactFormatResult.innerHTML = '';
             
             // Create form data
             const formData = new FormData();
+            formData.append('projectTitle', projectTitle);
             
             // Add all files with the same field name
             selectedFiles.forEach(file => {
@@ -242,8 +325,35 @@
                 
                 const data = await response.json();
                 
-                // Display the tutorial
-                const formattedTutorial = data.tutorial.replace(/\n/g, '<br>');
+                // Split the tutorial and React format
+                const tutorialContent = data.tutorial;
+                
+                // Find the React Component Format section
+                const reactFormatIndex = tutorialContent.indexOf('## React Component Format');
+                
+                let mainTutorial, reactFormat;
+                
+                if (reactFormatIndex !== -1) {
+                    mainTutorial = tutorialContent.substring(0, reactFormatIndex).trim();
+                    reactFormat = tutorialContent.substring(reactFormatIndex).trim();
+                    
+                    // Extract the code block from the React format section
+                    const codeBlockStart = reactFormat.indexOf('```javascript');
+                    const codeBlockEnd = reactFormat.lastIndexOf('```');
+                    
+                    if (codeBlockStart !== -1 && codeBlockEnd !== -1) {
+                        const codeBlock = reactFormat.substring(codeBlockStart + 13, codeBlockEnd).trim();
+                        reactFormatResult.innerHTML = `<pre>${codeBlock}</pre>`;
+                    } else {
+                        reactFormatResult.innerHTML = '<p>No React format found in the generated content.</p>';
+                    }
+                } else {
+                    mainTutorial = tutorialContent;
+                    reactFormatResult.innerHTML = '<p>No React format found in the generated content.</p>';
+                }
+                
+                // Display the main tutorial with formatting
+                const formattedTutorial = mainTutorial.replace(/\n/g, '<br>');
                 tutorialResult.innerHTML = formattedTutorial;
                 
             } catch (error) {
@@ -253,6 +363,44 @@
                 // Hide loader
                 loader.style.display = 'none';
             }
+        });
+        
+        // Tab switching
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons and content
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Show the corresponding content
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // Copy React format
+        copyReactBtn.addEventListener('click', function() {
+            const reactCode = reactFormatResult.textContent;
+            
+            if (!reactCode || reactCode.includes('No React format found')) {
+                alert('No React format available to copy');
+                return;
+            }
+            
+            navigator.clipboard.writeText(reactCode)
+                .then(() => {
+                    this.textContent = 'Copied!';
+                    setTimeout(() => {
+                        this.textContent = 'Copy React Format';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    alert('Failed to copy to clipboard');
+                });
         });
     </script>
 </body>

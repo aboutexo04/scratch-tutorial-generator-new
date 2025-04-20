@@ -58,6 +58,12 @@ app.post('/generate-tutorial', upload.array('scratchImages', 5), async (req, res
             return res.status(400).json({ error: 'No images uploaded' });
         }
 
+        // Get any title from the form if provided
+        const projectTitle = req.body.projectTitle || "Scratch Project Tutorial";
+
+        // Store uploaded image paths - we'll need these for the React format
+        const uploadedImages = req.files.map(file => file.filename);
+
         // Process the first image
         const firstImagePath = req.files[0].path;
         const firstImageType = req.files[0].mimetype; // Get the actual mimetype
@@ -84,7 +90,9 @@ app.post('/generate-tutorial', upload.array('scratchImages', 5), async (req, res
             firstBase64Image, 
             additionalImages, 
             firstImageType, 
-            additionalImageTypes
+            additionalImageTypes,
+            projectTitle,
+            uploadedImages
         );
         
         // Return the generated tutorial
@@ -101,7 +109,7 @@ app.post('/generate-tutorial', upload.array('scratchImages', 5), async (req, res
 });
 
 // Function to generate tutorial using Claude API
-async function generateTutorial(base64Image, additionalImages = [], imageType, additionalImageTypes = []) {
+async function generateTutorial(base64Image, additionalImages = [], imageType, additionalImageTypes = [], projectTitle, uploadedImages) {
     try {
         const apiKey = process.env.CLAUDE_API_KEY;
         
@@ -114,8 +122,48 @@ async function generateTutorial(base64Image, additionalImages = [], imageType, a
             {
                 type: 'text',
                 text: additionalImages.length > 0 
-                    ? `These are ${additionalImages.length + 1} screenshots of a Scratch project. Please analyze these images and create a clear, step-by-step tutorial explaining what the program does and how to recreate it. Focus on identifying the sprites, blocks, and logic flow. Make the tutorial appropriate for beginners with clear explanations of each step. Structure it with sections for: 1) Project Overview, 2) Components Used, 3) Step-by-Step Instructions, and 4) Tips for Modifications.`
-                    : 'This is a screenshot of a Scratch project. Please analyze this image and create a clear, step-by-step tutorial explaining what the program does and how to recreate it. Focus on identifying the sprites, blocks, and logic flow. Make the tutorial appropriate for beginners with clear explanations of each step. Structure it with sections for: 1) Project Overview, 2) Components Used, 3) Step-by-Step Instructions, and 4) Tips for Modifications.'
+                    ? `These are ${additionalImages.length + 1} screenshots of a Scratch project called "${projectTitle}". Please analyze these images and create a clear, step-by-step tutorial explaining what the program does and how to recreate it. Focus on identifying the sprites, blocks, and logic flow. Make the tutorial appropriate for beginners with clear explanations of each step. Structure it with sections for: 1) Project Overview, 2) Components Used, 3) Step-by-Step Instructions, and 4) Tips for Modifications. 
+                    
+                    VERY IMPORTANT: After the tutorial, please add a new section titled "React Component Format" and include a JavaScript object format that looks exactly like this:
+                    
+                    \`\`\`javascript
+                    [
+                      {
+                        title: "Introduction to ${projectTitle}",
+                        description: "Brief introduction to what we'll be building",
+                        images: ["/images/imagefilename1.png"]
+                      },
+                      {
+                        title: "Step 1: [First Major Step]",
+                        description: "Description of what to do in this step",
+                        images: ["/images/imagefilename2.png"]
+                      },
+                      // Add more steps as needed
+                    ]
+                    \`\`\`
+                    
+                    The images array for each step should use these exact filenames: ${JSON.stringify(uploadedImages)}. Distribute them appropriately across the different steps. Make sure to create logical, sequential steps that match your tutorial content.`
+                    : `This is a screenshot of a Scratch project called "${projectTitle}". Please analyze this image and create a clear, step-by-step tutorial explaining what the program does and how to recreate it. Focus on identifying the sprites, blocks, and logic flow. Make the tutorial appropriate for beginners with clear explanations of each step. Structure it with sections for: 1) Project Overview, 2) Components Used, 3) Step-by-Step Instructions, and 4) Tips for Modifications.
+                    
+                    VERY IMPORTANT: After the tutorial, please add a new section titled "React Component Format" and include a JavaScript object format that looks exactly like this:
+                    
+                    \`\`\`javascript
+                    [
+                      {
+                        title: "Introduction to ${projectTitle}",
+                        description: "Brief introduction to what we'll be building",
+                        images: ["/images/imagefilename1.png"]
+                      },
+                      {
+                        title: "Step 1: [First Major Step]",
+                        description: "Description of what to do in this step",
+                        images: ["/images/imagefilename2.png"]
+                      },
+                      // Add more steps as needed
+                    ]
+                    \`\`\`
+                    
+                    The images array should use this exact filename: ${JSON.stringify(uploadedImages[0])}. Make sure to create logical, sequential steps that match your tutorial content.`
             },
             {
                 type: 'image',
