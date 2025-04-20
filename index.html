@@ -160,6 +160,17 @@
         .tab-content.active {
             display: block;
         }
+        
+        .tab-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .tab-header h2 {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -196,14 +207,19 @@
             </div>
             
             <div id="tutorial-tab" class="tab-content active">
-                <h2>Generated Tutorial</h2>
+                <div class="tab-header">
+                    <h2>Generated Tutorial</h2>
+                    <button id="copy-tutorial-btn" class="button">Copy Tutorial</button>
+                </div>
                 <div id="tutorial-result"></div>
             </div>
             
             <div id="react-format-tab" class="tab-content">
-                <h2>React Component Format</h2>
+                <div class="tab-header">
+                    <h2>React Component Format</h2>
+                    <button id="copy-react-btn" class="button">Copy React Format</button>
+                </div>
                 <div id="react-format-result"></div>
-                <button id="copy-react-btn" class="button" style="margin-top: 15px;">Copy React Format</button>
             </div>
         </div>
     </div>
@@ -216,9 +232,13 @@
         const loader = document.getElementById('loader');
         const tutorialResult = document.getElementById('tutorial-result');
         const reactFormatResult = document.getElementById('react-format-result');
+        const copyTutorialBtn = document.getElementById('copy-tutorial-btn');
         const copyReactBtn = document.getElementById('copy-react-btn');
         const tabButtons = document.querySelectorAll('.tab-button');
         const tabContents = document.querySelectorAll('.tab-content');
+        
+        // Store the raw tutorial text for copying
+        let rawTutorialText = '';
         
         // Selected files array to manage our files
         let selectedFiles = [];
@@ -337,6 +357,9 @@
                     mainTutorial = tutorialContent.substring(0, reactFormatIndex).trim();
                     reactFormat = tutorialContent.substring(reactFormatIndex).trim();
                     
+                    // Store raw tutorial text for copying
+                    rawTutorialText = mainTutorial;
+                    
                     // Extract the code block from the React format section
                     const codeBlockStart = reactFormat.indexOf('```javascript');
                     const codeBlockEnd = reactFormat.lastIndexOf('```');
@@ -349,6 +372,7 @@
                     }
                 } else {
                     mainTutorial = tutorialContent;
+                    rawTutorialText = mainTutorial;
                     reactFormatResult.innerHTML = '<p>No React format found in the generated content.</p>';
                 }
                 
@@ -359,6 +383,7 @@
             } catch (error) {
                 console.error('Error:', error);
                 tutorialResult.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                rawTutorialText = '';
             } finally {
                 // Hide loader
                 loader.style.display = 'none';
@@ -379,6 +404,26 @@
                 const tabId = this.getAttribute('data-tab');
                 document.getElementById(`${tabId}-tab`).classList.add('active');
             });
+        });
+        
+        // Copy Tutorial
+        copyTutorialBtn.addEventListener('click', function() {
+            if (!rawTutorialText) {
+                alert('No tutorial available to copy');
+                return;
+            }
+            
+            navigator.clipboard.writeText(rawTutorialText)
+                .then(() => {
+                    this.textContent = 'Copied!';
+                    setTimeout(() => {
+                        this.textContent = 'Copy Tutorial';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    alert('Failed to copy to clipboard');
+                });
         });
         
         // Copy React format
